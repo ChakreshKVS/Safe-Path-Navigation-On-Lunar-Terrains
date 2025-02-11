@@ -1,0 +1,9 @@
+flask==2.0.1
+numpy==1.21.0
+torch==2.0.0
+matplotlib==3.4.2
+plotly==5.1.0
+scipy==1.7.0
+werkzeug==2.0.1
+pillow==8.2.0
+opencv-python 

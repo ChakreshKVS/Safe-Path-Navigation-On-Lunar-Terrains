@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lunar Surface Height Map Generator</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --accent-color: #3498db;
+            --background-color: #1a1a1a;
+            --text-color: #ecf0f1;
+            --card-background: #2d2d2d;
+        }
+
+        body {
+            font-family: 'Space Grotesk', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            opacity: 0;
+            transform: translateY(-20px);
+            animation: fadeInDown 0.8s ease-out forwards;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: #95a5a6;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+        }
+
+        .upload-card {
+            background: rgba(45, 45, 45, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 0.8s ease-out forwards 0.3s;
+        }
+
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .file-input-container {
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            margin: 20px 0;
+        }
+
+        #fileInput {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed var(--accent-color);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-color);
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        #fileInput::-webkit-file-upload-button {
+            visibility: hidden;
+            width: 0;
+        }
+
+        #fileInput::before {
+            content: 'Choose Lunar Image';
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 4px;
+            background: var(--accent-color);
+            color: white;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+
+        #fileInput:hover::before {
+            background: #2980b9;
+        }
+
+        .button {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+
+        .button:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+
+        #loading {
+            display: none;
+            color: var(--accent-color);
+            font-size: 18px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .result-container {
+            background: rgba(45, 45, 45, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 30px;
+            display: grid;
+            gap: 30px;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInUp 0.8s ease-out forwards 0.6s;
+        }
+
+        .maps-container {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 25px;
+            margin: 15px 0;
+            align-items: start;
+        }
+
+        .map-card {
+            background: rgba(30, 30, 30, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            height: fit-content;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .map-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
+            border-color: var(--accent-color);
+        }
+
+        .map-title {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: var(--accent-color);
+            position: relative;
+            padding-left: 15px;
+        }
+
+        .map-title::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 20px;
+            background: var(--accent-color);
+            border-radius: 2px;
+        }
+
+        #result {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .height-map {
+            width: 100%;
+            height: auto;
+            object-fit: contain;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .height-map:hover {
+            transform: scale(1.02);
+        }
+
+        #plotly-terrain {
+            width: 100% !important;
+            height: 500px !important;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #threejs-terrain {
+            width: 100% !important;
+            height: 500px !important;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        /* Force Plotly container sizing */
+        .js-plotly-plot, .plot-container, .plotly {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .main-svg {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        .view-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .control-button {
+            background: linear-gradient(135deg, var(--accent-color), #2980b9);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .control-button::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.2),
+                transparent
+            );
+            transition: 0.5s;
+        }
+
+        .control-button:hover::after {
+            left: 100%;
+        }
+
+        .control-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            .maps-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .map-card {
+                width: 100%;
+            }
+
+            #plotly-terrain, #threejs-terrain {
+                height: 400px !important;
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Loading Animation */
+        .loading-spinner {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: var(--accent-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .upload-card {
+                padding: 20px;
+            }
+
+            .maps-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .map-card {
+                height: auto;
+            }
+        }
+
+        #threejsContainer {
+            width: 100%;
+            height: 80vh;
+            position: relative;
+            margin: 30px 0;
+            border-radius: 15px;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #000000, #111);
+        }
+
+        .scene-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(45, 45, 45, 0.8);
+            padding: 15px;
+            border-radius: 12px;
+            display: flex;
+            gap: 10px;
+            backdrop-filter: blur(5px);
+        }
+
+        .control-button {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        .control-button:hover {
+            background-color: #2980b9;
+        }
+
+        .control-button.active {
+            background: #27ae60;
+        }
+
+        .control-button {
+            background-color: var(--accent-color);
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s ease;
+        }
+
+        .control-button:hover {
+            background-color: #2980b9;
+        }
+
+        #plotly-terrain, #threejs-terrain {
+            width: 100%;
+            height: 600px;
+            margin: 20px 0;
+        }
+
+        /* Stars background */
+        .stars-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10000;
+        }
+
+        .star {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+            opacity: 0;
+            animation: twinkle var(--duration) ease-in-out infinite;
+            animation-delay: var(--delay);
+        }
+
+        /* Entry animation overlay */
+        .entry-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 10001;
+            animation: fadeOut 2s ease-out forwards;
+        }
+
+        .entry-rocket {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, 100vh) rotate(-45deg);
+            font-size: 48px;
+            z-index: 10002;
+            animation: rocketEntry 2s ease-out forwards;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.2); }
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; pointer-events: none; }
+        }
+
+        @keyframes rocketEntry {
+            0% {
+                transform: translate(-50%, 100vh) rotate(-45deg);
+                opacity: 0;
+            }
+            50% {
+                transform: translate(-50%, -50%) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -150vh) rotate(45deg);
+                opacity: 0;
+            }
+        }
+
+        /* Stars and space background */
+        .space-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at bottom, #1B2735 0%, #090A0F 100%);
+            z-index: -1;
+        }
+
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .star {
+            position: absolute;
+            background: #FFF;
+            border-radius: 50%;
+        }
+
+        /* Entry animation elements */
+        .entry-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .entry-overlay {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: black;
+            animation: fadeOut 3s ease-out forwards;
+        }
+
+        .entry-rocket {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            font-size: 48px;
+            transform: translate(-50%, -150vh);
+            animation: rocketLand 3s ease-out forwards;
+        }
+
+        .entry-glow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.2) 0%, transparent 70%);
+            opacity: 0;
+            animation: glowPulse 3s ease-out forwards;
+        }
+
+        .earth-entry {
+            position: absolute;
+            top: -100%;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, 
+                rgba(100,149,237,0) 0%,
+                rgba(100,149,237,0.2) 50%,
+                rgba(100,149,237,0) 100%);
+            animation: earthEntry 3s ease-out forwards;
+        }
+
+        /* Animations */
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            60% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        @keyframes rocketLand {
+            0% {
+                transform: translate(-50%, -150vh) rotate(180deg);
+                opacity: 0;
+            }
+            40% {
+                transform: translate(-50%, -50%) rotate(0deg);
+                opacity: 1;
+            }
+            60% {
+                transform: translate(-50%, -50%) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, 150vh) rotate(0deg);
+                opacity: 0;
+            }
+        }
+
+        @keyframes glowPulse {
+            0% { opacity: 0; }
+            40% { opacity: 0; }
+            60% { opacity: 0.5; }
+            100% { opacity: 0; }
+        }
+
+        @keyframes earthEntry {
+            0% { 
+                transform: translateY(0%);
+                opacity: 0;
+            }
+            40% { 
+                transform: translateY(100%);
+                opacity: 1;
+            }
+            60% { 
+                transform: translateY(100%);
+                opacity: 1;
+            }
+            100% { 
+                transform: translateY(200%);
+                opacity: 0;
+            }
+        }
+
+        @keyframes twinkle {
+            0%, 100% { 
+                opacity: 0.3; 
+                transform: scale(1);
+            }
+            50% { 
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+
+        /* Enhanced star trails */
+        .star-trail {
+            position: absolute;
+            width: 2px;
+            height: 50px;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.3), transparent);
+            transform-origin: top;
+            animation: starTrail 3s linear infinite;
+        }
+
+        @keyframes starTrail {
+            0% {
+                transform: translateY(-100%) rotate(15deg);
+                opacity: 0;
+            }
+            50% {
+                opacity: 0.5;
+            }
+            100% {
+                transform: translateY(100%) rotate(15deg);
+                opacity: 0;
+            }
+        }
+    </style>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div class="space-background"></div>
+    <div class="stars" id="starsContainer"></div>
+    <div class="entry-animation">
+        <div class="earth-entry"></div>
+        <div class="entry-overlay"></div>
+        <div class="entry-glow"></div>
+        <div class="entry-rocket">🛸</div>
+    </div>
+    <div class="container">
+        <div class="header">
+            <h1>Lunar Surface Height Map Generator</h1>
+            <div class="subtitle">Upload a lunar surface image to generate its height map and terrain data</div>
+        </div>
+        
+        <div class="upload-card">
+            <form id="uploadForm" class="upload-form">
+                <div class="file-input-container">
+                    <input type="file" id="fileInput" accept=".jpg,.jpeg,.png" required>
+                </div>
+                <button type="submit" class="button">Generate Height Map</button>
+            </form>
+        </div>
+
+        <div id="loading">
+            <div class="loading-spinner"></div>
+            <p>Processing your lunar image...</p>
+        </div>
+
+        <div class="result-container">
+            <div class="maps-container">
+                <div class="map-card">
+                    <div class="map-title">2D Height Map</div>
+                    <div id="result"></div>
+                </div>
+                <div class="map-card">
+                    <div class="map-title">3D Terrain View</div>
+                    <div id="plotly-terrain"></div>
+                    <div id="threejs-terrain"></div>
+                </div>
+            </div>
+            
+            <div class="view-controls">
+                <button id="toggleView" class="control-button">Toggle 3D View</button>
+                <div id="downloadContainer">
+                    <button id="downloadButton" class="control-button">Download NPY Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentNpyFilename = '';
+
+        function createPlotlyTerrain(heightData, dimensions, imageData = null) {
+            // Generate coordinate grids
+            const n = dimensions.width;
+            const res = 1; // Resolution in meters
+            
+            const xx = [];
+            const yy = [];
+            for (let i = 0; i < n; i++) {
+                const row_x = [];
+                const row_y = [];
+                for (let j = 0; j < n; j++) {
+                    row_x.push(j * res + res / 2.0);
+                    row_y.push(i * res + res / 2.0);
+                }
+                xx.push(row_x);
+                yy.push(row_y);
+            }
+
+            // Custom grayscale colorscale for lunar surface
+            const lunarColorscale = [
+                [0, 'rgb(40, 37, 34)'],     // Dark brownish-gray for deep shadows
+                [0.2, 'rgb(82, 77, 72)'],   // Dark lunar regolith
+                [0.4, 'rgb(120, 115, 110)'], // Medium lunar surface
+                [0.6, 'rgb(145, 140, 135)'], // Light lunar surface
+                [0.8, 'rgb(170, 165, 160)'], // Lighter areas
+                [1, 'rgb(190, 185, 180)']    // Brightest peaks with slight warm tone
+            ];
+
+            const fig = {
+                data: [],
+                layout: {
+                    scene: {
+                        xaxis_title: "x-axis (m)",
+                        yaxis_title: "y-axis (m)",
+                        zaxis_title: "Height (m)",
+                        aspectratio: { x: 1, y: 1, z: 0.2 },
+                        camera: { eye: { x: 1.5, y: 1.5, z: 1 } },
+                        // Set background color to black for space-like appearance
+                        bgcolor: 'rgb(0, 0, 0)'
+                    },
+                    title: "Interactive 3D Lunar Terrain",
+                    showlegend: true,
+                    margin: { l: 0, r: 0, t: 30, b: 0 },
+                    width: 800,
+                    height: 600,
+                    paper_bgcolor: 'rgb(0, 0, 0)',
+                    plot_bgcolor: 'rgb(0, 0, 0)',
+                    font: { color: 'rgb(200, 200, 200)' }
+                }
+            };
+
+            if (imageData) {
+                // Convert RGB image data to grayscale if provided
+                const grayscaleTexture = new Array(dimensions.height);
+                for (let i = 0; i < dimensions.height; i++) {
+                    grayscaleTexture[i] = new Array(dimensions.width);
+                    for (let j = 0; j < dimensions.width; j++) {
+                        const idx = (i * dimensions.width + j) * 4;
+                        grayscaleTexture[i][j] = (
+                            imageData[idx] * 0.2989 + 
+                            imageData[idx + 1] * 0.5870 + 
+                            imageData[idx + 2] * 0.1140
+                        ) / 255;
+                    }
+                }
+
+                // Add surface with lunar texture
+                fig.data.push({
+                    type: 'surface',
+                    x: xx,
+                    y: yy,
+                    z: heightData,
+                    surfacecolor: grayscaleTexture,
+                    colorscale: lunarColorscale,
+                    showscale: false,
+                    opacity: 1.0,
+                    lighting: {
+                        ambient: 0.6,
+                        diffuse: 0.5,
+                        fresnel: 0.1,
+                        specular: 0.2,
+                        roughness: 0.5
+                    },
+                    contours: {
+                        z: {
+                            show: true,
+                            usecolormap: true,
+                            highlightcolor: "rgb(200, 200, 200)",
+                            project: { z: true }
+                        }
+                    }
+                });
+            } else {
+                // Add default height map terrain
+                fig.data.push({
+                    type: 'surface',
+                    x: xx,
+                    y: yy,
+                    z: heightData,
+                    colorscale: lunarColorscale,
+                    showscale: true,
+                    opacity: 0.9,
+                    lighting: {
+                        ambient: 0.6,
+                        diffuse: 0.5,
+                        fresnel: 0.1,
+                        specular: 0.2,
+                        roughness: 0.5
+                    },
+                    contours: {
+                        z: {
+                            show: true,
+                            usecolormap: true,
+                            highlightcolor: "rgb(200, 200, 200)",
+                            project: { z: true }
+                        }
+                    }
+                });
+            }
+
+            // Update colorbar style if shown
+            if (fig.data[0].showscale) {
+                fig.data[0].colorbar = {
+                    title: 'Height (m)',
+                    titlefont: { color: 'rgb(200, 200, 200)' },
+                    tickfont: { color: 'rgb(200, 200, 200)' },
+                    outlinecolor: 'rgb(200, 200, 200)'
+                };
+            }
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToAdd: [{
+                    name: 'Toggle Rotation',
+                    icon: Plotly.Icons.camera,
+                    click: function(gd) {
+                        const scene = gd._fullLayout.scene;
+                        if (scene._isRotating) {
+                            Plotly.relayout(gd, 'scene.camera.up', scene.camera.up);
+                            scene._isRotating = false;
+                        } else {
+                            const rotate = () => {
+                                if (!scene._isRotating) return;
+                                const eye = scene.camera.eye;
+                                const rho = Math.sqrt(eye.x * eye.x + eye.y * eye.y);
+                                const theta = Math.atan2(eye.y, eye.x) + 0.05;
+                                Plotly.relayout(gd, {
+                                    'scene.camera.eye.x': rho * Math.cos(theta),
+                                    'scene.camera.eye.y': rho * Math.sin(theta)
+                                });
+                                requestAnimationFrame(rotate);
+                            };
+                            scene._isRotating = true;
+                            rotate();
+                        }
+                    }
+                }],
+                modeBarStyle: {
+                    bgcolor: 'rgba(0,0,0,0.2)',
+                    color: 'rgb(200, 200, 200)'
+                }
+            };
+
+            Plotly.newPlot('plotly-terrain', fig.data, fig.layout, config);
+        }
+
+        document.getElementById('uploadForm').onsubmit = async function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            const downloadContainer = document.getElementById('downloadContainer');
+            const toggleViewButton = document.getElementById('toggleView');
+            
+            if (!fileInput.files.length) {
+                result.innerHTML = '<div class="error-message">Please select a file</div>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            loading.style.display = 'block';
+            result.innerHTML = '';
+            downloadContainer.style.display = 'none';
+            toggleViewButton.style.display = 'none'; // Hide button until processing is complete
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentNpyFilename = data.npy_filename;
+                    
+                    // Create Plotly visualization
+                    createPlotlyTerrain(data.height_data, data.dimensions, data.image_data);
+                    
+                    // Display the 2D height map
+                    result.innerHTML = `
+                        <h3>Generated Height Map</h3>
+                        <img src="data:image/png;base64,${data.plot}" class="height-map" alt="Generated Height Map">
+                    `;
+                    
+                    // Setup download button
+                    downloadContainer.style.display = 'block';
+                    document.getElementById('downloadButton').onclick = function() {
+                        window.location.href = `/download/${data.npy_filename}`;
+                    };
+
+                    // Show and setup the 3D view button
+                    toggleViewButton.style.display = 'block';
+                    toggleViewButton.onclick = function() {
+                        window.location.href = `/view3d/${data.npy_filename}`;
+                    };
+                } else {
+                    result.innerHTML = `<div class="error-message">Error: ${data.error}</div>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                result.innerHTML = '<div class="error-message">An error occurred during processing</div>';
+            } finally {
+                loading.style.display = 'none';
+            }
+        };
+
+        // Keep the resize handler
+        window.addEventListener('resize', function() {
+            const plotlyView = document.getElementById('plotly-terrain');
+            if (plotlyView.style.display === 'block') {
+                Plotly.Plots.resize('plotly-terrain');
+            }
+        });
+
+        // Create stars with different sizes and animations
+        function createStars() {
+            const container = document.getElementById('starsContainer');
+            const starCount = 150;
+            const trailCount = 20;
+
+            // Create regular stars
+            for (let i = 0; i < starCount; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                
+                const size = Math.random() * 2 + 1;
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                
+                star.style.width = `${size}px`;
+                star.style.height = `${size}px`;
+                star.style.left = `${left}%`;
+                star.style.top = `${top}%`;
+                star.style.animation = `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`;
+                star.style.animationDelay = `${Math.random() * 3}s`;
+                
+                container.appendChild(star);
+            }
+
+            // Create star trails
+            for (let i = 0; i < trailCount; i++) {
+                const trail = document.createElement('div');
+                trail.className = 'star-trail';
+                
+                const left = Math.random() * 100;
+                const delay = Math.random() * 2;
+                
+                trail.style.left = `${left}%`;
+                trail.style.animationDelay = `${delay}s`;
+                
+                container.appendChild(trail);
+            }
+        }
+
+        // Initialize when document loads
+        document.addEventListener('DOMContentLoaded', () => {
+            createStars();
+            
+            // Add parallax effect to stars on mouse move
+            document.addEventListener('mousemove', (e) => {
+                const stars = document.querySelectorAll('.star');
+                const mouseX = e.clientX / window.innerWidth - 0.5;
+                const mouseY = e.clientY / window.innerHeight - 0.5;
+
+                stars.forEach((star, index) => {
+                    const depth = index % 3 + 1;
+                    const translateX = mouseX * depth * 15;
+                    const translateY = mouseY * depth * 15;
+                    star.style.transform = `translate(${translateX}px, ${translateY}px)`;
+                });
+            });
+
+            // Remove entry animation elements after they complete
+            setTimeout(() => {
+                const entryAnimation = document.querySelector('.entry-animation');
+                if (entryAnimation) {
+                    entryAnimation.remove();
+                }
+            }, 4000);
+        });
+    </script>
+</body>
+</html> 

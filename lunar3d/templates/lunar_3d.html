@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lunar Surface Analysis</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+        }
+        #scene-container {
+            width: 100vw;
+            height: 100vh;
+            transition: all 0.5s ease;
+        }
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            gap: 15px;
+            background: rgba(30, 30, 30, 0.8);
+            padding: 15px 25px;
+            border-radius: 12px;
+            backdrop-filter: blur(5px);
+        }
+        .nav-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .control-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .control-button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+        .view-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .view-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+        .view-content img {
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+        .close-button {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .close-button:hover {
+            background: #c0392b;
+        }
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 1s ease;
+        }
+        .loading-content {
+            text-align: center;
+            color: white;
+        }
+        .loading-bar {
+            width: 200px;
+            height: 4px;
+            background: #222;
+            border-radius: 2px;
+            margin: 20px auto;
+            overflow: hidden;
+        }
+        .loading-progress {
+            width: 0%;
+            height: 100%;
+            background: #3498db;
+            transition: width 0.3s ease;
+        }
+        .control-button.active {
+            background: #2ecc71;
+        }
+        .control-button.active:hover {
+            background: #27ae60;
+        }
+        .error-message {
+            color: white;
+            padding: 20px;
+            text-align: center;
+            background: rgba(231, 76, 60, 0.2);
+            border-radius: 8px;
+            border: 1px solid #e74c3c;
+        }
+        
+        #plotlyGraph {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90vw;
+            max-height: 80vh;
+            overflow: auto;
+        }
+        
+        /* Add these new styles */
+        .exit-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 2000;
+            display: none;
+            pointer-events: none;
+        }
+        
+        .exit-animation.active {
+            display: block;
+            animation: fadeToWhite 1.5s ease-in forwards;
+        }
+        
+        @keyframes fadeToWhite {
+            0% { background: rgba(0, 0, 0, 0); }
+            100% { background: rgba(255, 255, 255, 1); }
+        }
+        
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-screen">
+        <div class="loading-content">
+            <h2>Loading Lunar Surface</h2>
+            <div class="loading-bar">
+                <div class="loading-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="scene-container"></div>
+    
+    <div class="controls">
+        <button class="control-button" id="wireframeToggle">Toggle Wireframe</button>
+        <button class="control-button" id="rotateToggle">Toggle Rotation</button>
+        <button class="control-button" id="resetCamera">Reset Camera</button>
+    </div>
+
+    <div class="nav-controls">
+        <button class="control-button" onclick="showOriginalImage()">Original Image</button>
+        <button class="control-button" onclick="showHeightMap()">Height Map</button>
+        <button class="control-button" onclick="showPlotly()">2D Plot</button>
+        <button class="control-button" onclick="navigateToSafePath()">Safe Path</button>
+    </div>
+
+    <div id="originalImageView" class="view-container">
+        <div class="view-content">
+            <button class="close-button" onclick="closeView('originalImageView')">Close</button>
+            <img src="{{ original_image_url }}" 
+                 alt="Original Image" 
+                 onerror="this.parentElement.innerHTML='<div class=\'error-message\'>Original image not available</div>'">
+        </div>
+    </div>
+
+    <div id="heightMapView" class="view-container">
+        <div class="view-content">
+            <button class="close-button" onclick="closeView('heightMapView')">Close</button>
+            <img src="{{ height_map_url }}" 
+                 alt="Height Map" 
+                 onerror="this.parentElement.innerHTML='<div class=\'error-message\'>Height map not available</div>'">
+        </div>
+    </div>
+
+    <div id="plotlyView" class="view-container">
+        <div class="view-content">
+            <button class="close-button" onclick="closeView('plotlyView')">Close</button>
+            <div id="plotlyGraph">
+                {{ plotly_div | safe }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Add this new div for the exit animation -->
+    <div class="exit-animation" id="exitAnimation"></div>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let terrain, wireframe, particleSystem;
+        let isRotating = true;
+        let wireframeMode = false;
+        
+        // Animation state
+        const startPosition = { y: -2000, z: 2000 };
+        const endPosition = { y: -100, z: 100 };
+        let animationStartTime = null;
+        const animationDuration = 3000; // 3 seconds
+        
+        const heightData = {{ height_data | tojson }};
+        const dimensions = {{ dimensions | tojson }};
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 5000);
+            // Set initial camera position
+            camera.position.set(0, startPosition.y, startPosition.z);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                logarithmicDepthBuffer: true 
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('scene-container').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enabled = false; // Disable controls during animation
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = true;
+            controls.minDistance = 50;
+            controls.maxDistance = 3000;
+
+            createStars();
+            createTerrain();
+            createLunarParticles();
+            setupLighting();
+
+            // Start animation immediately
+            requestAnimationFrame(startZoomAnimation);
+
+            // Update rotation toggle button text
+            updateRotationButtonText();
+            
+            // Start with rotation enabled
+            document.getElementById('rotateToggle').classList.add('active');
+        }
+
+        function startZoomAnimation(timestamp) {
+            if (!animationStartTime) animationStartTime = timestamp;
+            const elapsed = timestamp - animationStartTime;
+            const progress = Math.min(elapsed / animationDuration, 1);
+
+            // Cubic easing
+            const easeProgress = 1 - Math.pow(1 - progress, 3);
+
+            // Update camera position
+            camera.position.y = startPosition.y + (endPosition.y - startPosition.y) * easeProgress;
+            camera.position.z = startPosition.z + (endPosition.z - startPosition.z) * easeProgress;
+            camera.lookAt(0, 0, 0);
+
+            // Update particle opacity if they exist
+            if (particleSystem) {
+                particleSystem.material.opacity = progress * 0.5;
+            }
+
+            renderer.render(scene, camera);
+
+            if (progress < 1) {
+                requestAnimationFrame(startZoomAnimation);
+            } else {
+                // Animation complete
+                controls.enabled = true;
+                // Start regular animation loop
+                requestAnimationFrame(animate);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            if (isRotating) {
+                terrain.rotation.z += 0.002;
+                wireframe.rotation.z = terrain.rotation.z;
+                if (particleSystem) {
+                    particleSystem.rotation.z = terrain.rotation.z;
+                }
+            }
+
+            animateParticles();
+            renderer.render(scene, camera);
+        }
+
+        function createStars() {
+            const starGeometry = new THREE.BufferGeometry();
+            const starMaterial = new THREE.PointsMaterial({
+                color: 0xFFFFFF,
+                size: 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            const starVertices = [];
+            for(let i = 0; i < 5000; i++) {
+                const x = (Math.random() - 0.5) * 2000;
+                const y = (Math.random() - 0.5) * 2000;
+                const z = (Math.random() - 0.5) * 2000;
+                starVertices.push(x, y, z);
+            }
+
+            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            const stars = new THREE.Points(starGeometry, starMaterial);
+            scene.add(stars);
+        }
+
+        function createTerrain() {
+            const width = dimensions.width;
+            const height = dimensions.height;
+            const heightScale = 2.0;
+            
+            const geometry = new THREE.PlaneGeometry(
+                200, 200,
+                width - 1, height - 1
+            );
+
+            const positions = geometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                const x = Math.floor((i/3) % width);
+                const y = Math.floor((i/3) / width);
+                
+                if (heightData[y] && heightData[y][x] !== undefined) {
+                    positions[i + 2] = heightData[y][x] * heightScale;
+                }
+            }
+
+            geometry.computeVertexNormals();
+
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x7A7A7A,      // More neutral grey
+                metalness: 0.25,
+                roughness: 0.95,
+                flatShading: true,
+                side: THREE.DoubleSide,
+            });
+
+            terrain = new THREE.Mesh(geometry, material);
+            terrain.rotation.x = -Math.PI / 2;
+            terrain.castShadow = true;
+            terrain.receiveShadow = true;
+            scene.add(terrain);
+
+            const wireframeMaterial = new THREE.LineBasicMaterial({
+                color: 0x6E7177,    // Subtle gray that matches lunar surface
+                transparent: true,
+                opacity: 0.1,
+            });
+            
+            wireframe = new THREE.LineSegments(
+                new THREE.WireframeGeometry(geometry),
+                wireframeMaterial
+            );
+            wireframe.rotation.x = -Math.PI / 2;
+            wireframe.visible = false;
+            scene.add(wireframe);
+        }
+
+        function createLunarParticles() {
+            const particleCount = 1000;
+            const particles = new THREE.BufferGeometry();
+            const positions = [];
+            const velocities = [];  // Store velocity for each particle
+            
+            // Create particles in a layer above the terrain
+            for(let i = 0; i < particleCount; i++) {
+                // Random position above the terrain
+                const x = (Math.random() - 0.5) * 200;
+                const y = (Math.random() - 0.5) * 200;
+                const z = Math.random() * 20 + 5;  // Height above terrain
+                
+                positions.push(x, y, z);
+                
+                // Random velocity for each particle
+                velocities.push(
+                    (Math.random() - 0.5) * 0.1,  // x velocity
+                    (Math.random() - 0.5) * 0.1,  // y velocity
+                    (Math.random() - 0.5) * 0.05   // z velocity
+                );
+            }
+            
+            particles.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            particles.userData.velocities = velocities;  // Store velocities in userData
+            
+            // Updated particle material with more grey tone
+            const particleMaterial = new THREE.PointsMaterial({
+                color: 0x808080,  // Pure grey for particles
+                size: 0.3,
+                transparent: true,
+                opacity: 0.5,     // Slightly reduced opacity
+                blending: THREE.AdditiveBlending,
+                sizeAttenuation: true
+            });
+            
+            particleSystem = new THREE.Points(particles, particleMaterial);
+            particleSystem.rotation.x = -Math.PI / 2;  // Align with terrain
+            scene.add(particleSystem);
+        }
+
+        function setupLighting() {
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);  // Neutral grey ambient
+            scene.add(ambientLight);
+
+            const mainLight = new THREE.DirectionalLight(0xFFFFFF, 1.0);  // Pure white light
+            mainLight.position.set(100, 100, 100);
+            mainLight.castShadow = true;
+            scene.add(mainLight);
+
+            const fillLight = new THREE.DirectionalLight(0xDDDDDD, 0.4);  // Light grey fill
+            fillLight.position.set(-100, -100, 100);
+            scene.add(fillLight);
+
+            const rimLight = new THREE.DirectionalLight(0xCCCCCC, 0.3);   // Another grey tone
+            rimLight.position.set(0, 0, -100);
+            scene.add(rimLight);
+        }
+
+        function toggleWireframe() {
+            wireframeMode = !wireframeMode;
+            terrain.material.wireframe = wireframeMode;
+        }
+
+        function toggleRotation() {
+            isRotating = !isRotating;
+            if (!isRotating) {
+                controls.autoRotate = false;
+            } else {
+                controls.autoRotate = true;
+            }
+            updateRotationButtonText();
+            
+            // Toggle active class for button styling
+            document.getElementById('rotateToggle').classList.toggle('active');
+        }
+
+        function updateRotationButtonText() {
+            const rotateButton = document.getElementById('rotateToggle');
+            rotateButton.textContent = isRotating ? 'Stop Rotation' : 'Start Rotation';
+        }
+
+        function resetCamera() {
+            camera.position.set(0, 100, 100);
+            camera.lookAt(0, 0, 0);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animateParticles() {
+            if (particleSystem) {
+                const positions = particleSystem.geometry.attributes.position.array;
+                const velocities = particleSystem.geometry.userData.velocities;
+                
+                for(let i = 0; i < positions.length; i += 3) {
+                    // Update positions based on velocities
+                    positions[i] += velocities[i];     // x
+                    positions[i+1] += velocities[i+1]; // y
+                    positions[i+2] += velocities[i+2]; // z
+                    
+                    // Reset particles that move too far
+                    if (Math.abs(positions[i]) > 100) {
+                        positions[i] = (Math.random() - 0.5) * 200;
+                        velocities[i] = (Math.random() - 0.5) * 0.1;
+                    }
+                    if (Math.abs(positions[i+1]) > 100) {
+                        positions[i+1] = (Math.random() - 0.5) * 200;
+                        velocities[i+1] = (Math.random() - 0.5) * 0.1;
+                    }
+                    if (positions[i+2] < 0 || positions[i+2] > 25) {
+                        positions[i+2] = Math.random() * 20 + 5;
+                        velocities[i+2] = (Math.random() - 0.5) * 0.05;
+                    }
+                }
+                
+                particleSystem.geometry.attributes.position.needsUpdate = true;
+            }
+        }
+
+        // Add these new functions for view management
+        function showView(viewId) {
+            const view = document.getElementById(viewId);
+            view.style.display = 'flex';
+            setTimeout(() => {
+                view.style.opacity = '1';
+            }, 50);
+        }
+
+        function closeView(viewId) {
+            const view = document.getElementById(viewId);
+            view.style.opacity = '0';
+            setTimeout(() => {
+                view.style.display = 'none';
+            }, 500);
+        }
+
+        function showOriginalImage() {
+            showView('originalImageView');
+        }
+
+        function showHeightMap() {
+            showView('heightMapView');
+        }
+
+        function showPlotly() {
+            showView('plotlyView');
+        }
+
+        // Enhanced loading animation
+        function updateLoadingProgress(progress) {
+            document.querySelector('.loading-progress').style.width = `${progress}%`;
+            if (progress >= 100) {
+                setTimeout(() => {
+                    document.querySelector('.loading-screen').style.opacity = '0';
+                    setTimeout(() => {
+                        document.querySelector('.loading-screen').style.display = 'none';
+                    }, 1000);
+                }, 500);
+            }
+        }
+
+        // Update your init function to include loading progress
+        const originalInit = init;
+        init = function() {
+            let progress = 0;
+            const loadingInterval = setInterval(() => {
+                progress += 5;
+                updateLoadingProgress(progress);
+                if (progress >= 100) {
+                    clearInterval(loadingInterval);
+                    originalInit();
+                }
+            }, 100);
+        };
+
+        // Add error handling for image loading
+        function handleImageError(img) {
+            img.style.display = 'none';
+            const errorMsg = document.createElement('div');
+            errorMsg.style.color = 'white';
+            errorMsg.style.padding = '20px';
+            errorMsg.textContent = 'Image not available';
+            img.parentNode.appendChild(errorMsg);
+        }
+
+        // Update these event listeners to match the correct button IDs
+        document.getElementById('rotateToggle').addEventListener('click', toggleRotation);
+        document.getElementById('wireframeToggle').addEventListener('click', toggleWireframe);
+        document.getElementById('resetCamera').addEventListener('click', resetCamera);
+
+        // Move the init() call to after all the function definitions
+        window.addEventListener('load', function() {
+            init();
+            window.addEventListener('resize', onWindowResize, false);
+        });
+
+        function createExitStars() {
+            const exitAnimation = document.getElementById('exitAnimation');
+            // Create 200 stars
+            for (let i = 0; i < 200; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                // Random initial position
+                star.style.left = `${Math.random() * 100}vw`;
+                star.style.top = `${Math.random() * 100}vh`;
+                // Add animation
+                star.style.animation = `
+                    starZoom ${0.5 + Math.random() * 1}s linear forwards
+                `;
+                exitAnimation.appendChild(star);
+            }
+        }
+
+        function navigateToSafePath() {
+            const exitAnimation = document.getElementById('exitAnimation');
+            exitAnimation.style.display = 'block';
+            
+            // Create star zoom animation dynamically
+            const styleSheet = document.createElement('style');
+            styleSheet.textContent = `
+                @keyframes starZoom {
+                    0% {
+                        transform: scale(1) translate(0, 0);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: scale(3) translate(${window.innerWidth/2}px, ${window.innerHeight/2}px);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(styleSheet);
+            
+            // Start the animation
+            createExitStars();
+            exitAnimation.classList.add('active');
+            
+            // Navigate after animation
+            setTimeout(() => {
+                window.location.href = 'http://127.0.0.1:5003/';
+            }, 1500);
+        }
+    </script>
+</body>
+</html> 
