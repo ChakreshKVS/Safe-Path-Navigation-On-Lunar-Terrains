@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lunar Path Visualization</title>
+    <style>
+        body {
+            margin: 0;
+            background: url('/static/images/space_background.jpg') no-repeat center center fixed;
+            background-size: cover;
+            color: white;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        .container {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .visualization-frame {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #00ff00;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+        
+        .stats {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .rover {
+            width: 30px;
+            height: 30px;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            transition: all 0.5s linear;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Lunar Path Navigation Visualization</h1>
+        <div class="visualization-frame">
+            <div id="visualization"></div>
+        </div>
+        <div class="stats">
+            <h3>Path Statistics</h3>
+            <p>Estimated Travel Time: <span id="travelTime">Loading...</span></p>
+            <p>Path Length: <span id="pathLength">Loading...</span></p>
+            <p>Terrain Difficulty: <span id="terrainDifficulty">Loading...</span></p>
+        </div>
+    </div>
+
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script>
+        // Load the visualization data
+        const vizFrame = document.getElementById('visualization');
+        
+        function loadVisualization() {
+            fetch('/get_visualization_data')
+                .then(response => response.json())
+                .then(data => {
+                    // Insert the Plotly visualization
+                    vizFrame.innerHTML = data.html;
+                    
+                    // Update stats
+                    document.getElementById('travelTime').textContent = data.stats.travelTime;
+                    document.getElementById('pathLength').textContent = data.stats.pathLength;
+                    document.getElementById('terrainDifficulty').textContent = data.stats.difficulty;
+                    
+                    // Animate rover along the path
+                    animateRover(data.path);
+                });
+        }
+
+        function animateRover(pathPoints) {
+            const rover = document.createElement('img');
+            rover.src = '/static/images/rover.png';
+            rover.className = 'rover';
+            vizFrame.appendChild(rover);
+
+            let currentPoint = 0;
+            
+            function moveRover() {
+                if (currentPoint >= pathPoints.length) {
+                    currentPoint = 0;
+                }
+                
+                const point = pathPoints[currentPoint];
+                rover.style.left = point.x + 'px';
+                rover.style.top = point.y + 'px';
+                
+                currentPoint++;
+                setTimeout(moveRover, 100);
+            }
+            
+            moveRover();
+        }
+
+        // Load visualization when page loads
+        loadVisualization();
+    </script>
+</body>
+</html> 

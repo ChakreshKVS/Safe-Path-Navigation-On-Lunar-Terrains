@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lunar Terrain Analysis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .input-section {
+            margin: 20px 0;
+        }
+
+        .input-section div {
+            margin: 10px 0;
+        }
+
+        input[type="number"] {
+            width: 60px;
+            margin: 0 5px;
+        }
+
+        #plotly-terrain {
+            width: 100%;
+            height: 600px;
+            margin: 20px 0;
+        }
+
+        #planning-status {
+            margin: 10px 0;
+            padding: 10px;
+            font-weight: bold;
+        }
+
+        #plot-container {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .script-output {
+            margin-top: 20px;
+        }
+
+        #script-output {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .path-planning-section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .planning-controls {
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .path-results {
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        #view3DButton:hover {
+            background: #45a049;
+            transform: translateY(-1px);
+            transition: all 0.2s ease;
+        }
+
+        #planning-status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        #planning-status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        #planning-status.loading {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .path-display iframe {
+            width: 100%;
+            height: 500px;
+            border: none;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="stars"></div>
+    <div class="twinkling"></div>
+    
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-moon"></i> Lunar Terrain Analysis</h1>
+            <p>Upload lunar surface images to generate terrain data and height maps</p>
+        </div>
+        
+        <!-- Image Upload Section -->
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="upload-section">
+                <div class="upload-box" id="dropZone">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <input type="file" id="imageInput" name="image" accept="image/*">
+                    <p>Drag & Drop or Click to Upload Image</p>
+                    <span class="file-info">Supported formats: JPG, PNG</span>
+                </div>
+            </div>
+
+            <div class="button-section">
+                <button type="button" onclick="processImage('npy')" class="action-button" disabled id="npyButton">
+                    <i class="fas fa-file-download"></i> Generate NPY File
+                </button>
+                <button type="button" onclick="processImage('heightmap')" class="action-button" disabled id="heightmapButton">
+                    <i class="fas fa-mountain"></i> Generate Height Map
+                </button>
+            </div>
+        </form>
+
+        <div class="results-section">
+            <div class="image-container">
+                <h3><i class="fas fa-image"></i> Original Image</h3>
+                <div class="image-wrapper">
+                    <img id="originalImage" src="" alt="Original image will appear here">
+                </div>
+            </div>
+            
+            <div class="image-container">
+                <h3><i class="fas fa-chart-area"></i> Height Map</h3>
+                <div class="image-wrapper">
+                    <img id="heightMap" src="" alt="Height map will appear here">
+                </div>
+            </div>
+        </div>
+
+        <!-- Path Planning Section -->
+        <div class="path-planning-section">
+            <div class="planning-controls">
+                <h3>Path Planning Parameters</h3>
+                <form id="planning-form">
+                    <div class="form-group">
+                        <label>Start Position:</label>
+                        <input type="number" id="start-x" placeholder="X" value="164">
+                        <input type="number" id="start-y" placeholder="Y" value="240">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Goal Position:</label>
+                        <input type="number" id="goal-x" placeholder="X" value="250">
+                        <input type="number" id="goal-y" placeholder="Y" value="240">
+                    </div>
+
+                    <button type="submit" class="action-button">Generate Path</button>
+                </form>
+            </div>
+
+            <!-- Path Results Section -->
+            <div class="path-results">
+                <div id="planning-status" style="display: none; margin-bottom: 15px; padding: 10px; border-radius: 4px;"></div>
+                
+                <div class="path-display" style="width: 100%; margin-bottom: 20px;">
+                    <div id="path-plot" style="width: 100%; min-height: 500px; border: 1px solid #ccc; border-radius: 4px;"></div>
+                </div>
+
+                <button id="view3DButton" style="display: none; width: 100%; padding: 15px; margin: 10px 0; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">
+                    <i class="fas fa-cube"></i> View 3D Visualization
+                </button>
+
+                <div class="script-output" style="margin-top: 20px;">
+                    <pre id="script-output" style="background: #f5f5f5; padding: 10px; border-radius: 4px; max-height: 200px; overflow-y: auto;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading" class="loading hidden">
+        <div class="loader"></div>
+        <p>Processing Lunar Data...</p>
+    </div>
+
+    <div id="result"></div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const imageInput = document.getElementById('imageInput');
+        const npyButton = document.getElementById('npyButton');
+        const heightmapButton = document.getElementById('heightmapButton');
+
+        imageInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                displayImage(e.target.files[0]);
+                npyButton.disabled = false;
+                heightmapButton.disabled = false;
+            }
+        });
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('highlight');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('highlight');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            imageInput.files = files;
+            if (files.length > 0) {
+                displayImage(files[0]);
+                npyButton.disabled = false;
+                heightmapButton.disabled = false;
+            }
+        }
+
+        dropZone.addEventListener('click', () => {
+            imageInput.click();
+        });
+
+        function displayImage(file) {
+            if (file) {
+                const originalImage = document.getElementById('originalImage');
+                originalImage.src = URL.createObjectURL(file);
+                document.getElementById('heightMap').src = '';
+            }
+        }
+
+        function processImage(type) {
+            const fileInput = document.getElementById('imageInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                alert('Please select an image first');
+                return;
+            }
+
+            document.getElementById('loading').classList.remove('hidden');
+
+            const formData = new FormData();
+            formData.append('image', file);
+            formData.append('type', type);
+
+            fetch('/process', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => {
+                        throw new Error(data.error || 'Network response was not ok');
+                    });
+                }
+                if (type === 'npy') {
+                    return response.blob().then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = file.name.replace(/\.[^/.]+$/, '') + '.npy';
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        document.getElementById('loading').classList.add('hidden');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (type !== 'npy') {
+                    console.log('Received data:', data);
+                    document.getElementById('loading').classList.add('hidden');
+                    
+                    if (data.height_map) {
+                        document.getElementById('heightMap').src = 'data:image/png;base64,' + data.height_map;
+                    }
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                document.getElementById('loading').classList.add('hidden');
+                alert('Error: ' + error.message);
+            });
+        }
+    </script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <script>
+        document.getElementById('planning-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const statusEl = document.getElementById('planning-status');
+            const view3DButton = document.getElementById('view3DButton');
+            const outputElement = document.getElementById('script-output');
+            const plotContainer = document.getElementById('path-plot');
+            
+            statusEl.style.display = 'block';
+            statusEl.innerHTML = 'Initiating path planning... This may take several minutes.';
+            statusEl.style.color = 'blue';
+            view3DButton.style.display = 'none';
+
+            const data = {
+                start_x: parseInt(document.getElementById('start-x').value),
+                start_y: parseInt(document.getElementById('start-y').value),
+                goal_x: parseInt(document.getElementById('goal-x').value),
+                goal_y: parseInt(document.getElementById('goal-y').value)
+            };
+
+            try {
+                const response = await fetch('/apply_path', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) throw new Error('Failed to start path planning');
+                const { task_id } = await response.json();
+
+                // Updated polling parameters
+                let attempts = 0;
+                const maxAttempts = 1800; // 15 minutes with 500ms interval
+                
+                const checkResult = async () => {
+                    const resultResponse = await fetch(`/check_path_status/${task_id}`);
+                    if (!resultResponse.ok) throw new Error('Failed to check status');
+                    return await resultResponse.json();
+                };
+
+                const pollResult = async () => {
+                    while (attempts < maxAttempts) {
+                        const result = await checkResult();
+                        
+                        if (result.error) {
+                            throw new Error(result.error);
+                        }
+                        
+                        if (result.status !== 'processing') {
+                            // Display results
+                            if (result.visualization_path) {
+                                plotContainer.innerHTML = `<iframe src="${result.visualization_path}" style="width: 100%; height: 500px; border: none;"></iframe>`;
+                            }
+
+                            if (result.path_coords) {
+                                statusEl.innerHTML = 'Path generated successfully!';
+                                statusEl.style.color = 'green';
+                                
+                                localStorage.setItem('pathCoords', JSON.stringify(result.path_coords));
+                                if (result.terrain_data) {
+                                    localStorage.setItem('terrainData', JSON.stringify(result.terrain_data));
+                                }
+                                
+                                view3DButton.style.display = 'block';
+                                view3DButton.onclick = () => window.open('/visualize', '_blank');
+                            }
+                            return;
+                        }
+                        
+                        // Update status message periodically
+                        if (attempts % 60 === 0) { // Every 30 seconds
+                            const minutes = Math.floor(attempts / 120);
+                            statusEl.innerHTML = `Still processing... (${minutes} minutes elapsed)`;
+                        }
+                        
+                        attempts++;
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                    }
+                    throw new Error('Path planning timed out after 15 minutes');
+                };
+
+                await pollResult();
+
+            } catch (error) {
+                console.error('Error:', error);
+                statusEl.innerHTML = 'Error: ' + error.message;
+                statusEl.style.color = 'red';
+                outputElement.textContent = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>
