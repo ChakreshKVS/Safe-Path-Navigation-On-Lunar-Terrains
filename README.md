@@ -1,7 +1,7 @@
-# Safe-Path-Navigation  
+# Safe-Path-Navigation-On-Lunar-Terrains  
 
 ## Overview  
-Safe-Path-Navigation is a project designed to analyze lunar terrains and determine safe paths for navigation. The system processes high-resolution lunar images, performs terrain classification, and applies pathfinding algorithms to identify optimal routes.  
+Safe-Path-Navigation-On-Lunar-Terrains is a project designed to analyze lunar terrains and determine safe paths for navigation. The system processes high-resolution lunar images, performs terrain classification, and applies pathfinding algorithms to identify optimal routes.  
 
 ---
 
@@ -10,8 +10,8 @@ Safe-Path-Navigation is a project designed to analyze lunar terrains and determi
 ### **Step 1: Clone the Repository**  
 To get started, clone this repository to your local machine using:  
 ```bash
-git clone https://github.com/your-username/Safe-Path-Navigation.git
-cd Safe-Path-Navigation
+git clone https://github.com/your-username/Safe-Path-Navigation-On-Lunar-Terrains.git
+cd Safe-Path-Navigation-On-Lunar-Terrains 
 ```
 
 ### **Step 2: Download the Required TIFF File**  
@@ -30,7 +30,7 @@ python app1.py
 ```
 
 ## **Step 2: Run the Main Application**
-Return to the root folder (Safe-Path-Navigation) and run:
+Return to the root folder (Safe-Path-Navigation-On-Lunar-Terrains) and run:
 ```bash
 python app.py
 ```
